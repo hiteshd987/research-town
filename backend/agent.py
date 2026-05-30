@@ -61,13 +61,61 @@ class Agent:
         """
 
         # Step 1: Retrieve relevant episodic memories
-        # The query is the current context — so we get memories relevant to
-        # TODAY'S topic, not just the most recent memories
         query = f"{phase} {task} {context[:200]}"
         past_memories = self.memory.retrieve(query, n_results=3)
 
+        # ── CONTEXT VISIBILITY LOG ───────────────────────────────────
+        # Prints everything this agent is about to receive so you can
+        # confirm what information they are actually working with.
+        print(f"\n  ┌─ {self.name} | Day {day} | Phase: {phase}")
+
+        # KB summary — shared validated knowledge
+        if kb_summary.strip() and kb_summary.strip() != "(Empty — first day of research)":
+            kb_lines = kb_summary.strip().splitlines()
+            print(f"  │  KB Summary ({len(kb_lines)} lines):")
+            for line in kb_lines[:4]:   # show first 4 lines
+                print(f"  │    {line[:90]}")
+            if len(kb_lines) > 4:
+                print(f"  │    ... ({len(kb_lines) - 4} more lines)")
+        else:
+            print(f"  │  KB Summary: empty (Day 1)")
+
+        # Previous debate passed as context (only lead scientist gets this)
+        if context.strip():
+            ctx_lines = context.strip().splitlines()
+            print(f"  │  Context ({len(ctx_lines)} lines, first 3):")
+            for line in ctx_lines[:3]:
+                print(f"  │    {line[:90]}")
+            if len(ctx_lines) > 3:
+                print(f"  │    ... ({len(ctx_lines) - 3} more lines)")
+        else:
+            print(f"  │  Context: none")
+
+        # Episodic memories retrieved from vector search
+        # Format: rank | Day X | phase | first 70 chars of content
+        # "Day X / phase:" prefix is stored by memory.store() so we
+        # split on it to show metadata and content separately.
+        if past_memories:
+            print(f"  │  Memories retrieved ({len(past_memories)}) — ranked by relevance:")
+            for i, mem in enumerate(past_memories, 1):
+                # Memory is stored as "Day N / phase: <content>"
+                # Split into label and body for clean display
+                if ": " in mem[:30]:
+                    label_part, body = mem.split(": ", 1)
+                    label_part = label_part.strip()   # e.g. "Day 2 / research"
+                    body = body.strip()[:70]
+                else:
+                    label_part = f"Memory {i}"
+                    body = mem.strip()[:70]
+                rank_label = ["1st (most relevant)", "2nd", "3rd", "4th"][min(i-1, 3)]
+                print(f"  │    {rank_label:<20} | {label_part:<20} | {body}...")
+        else:
+            print(f"  │  Memories retrieved: none (first turn for this agent)")
+
+        print(f"  └─ calling Gemini...")
+        # ─────────────────────────────────────────────────────────────
+
         # Step 2: Build the full user message
-        # This is what the LLM sees as the "situation" today
         user_message = self._build_user_message(
             day=day,
             phase=phase,
@@ -78,12 +126,9 @@ class Agent:
         )
 
         # Step 3: Call the LLM
-        # The model sees: system_prompt (who am I) + user_message (what's happening)
-        print(f"    → {self.name} thinking...")
         response = call_llm(self.system_prompt, user_message)
 
-        # Step 4: Store this response in episodic memory
-        # Next time this agent is called, this response may be retrieved
+        # Step 4: Store response in episodic memory
         memory_content = f"Day {day} / {phase}: {response}"
         self.memory.store(memory_content, day=day, phase=phase)
 

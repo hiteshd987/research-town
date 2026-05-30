@@ -270,7 +270,6 @@ ACTION: ...
 CONFIDENCE: ...
 """.strip()
 
-
 class DevilsAdvocate(BaseAgent):
     """
     The contrarian. Attacks the Lead Scientist's hypothesis directly.
@@ -299,6 +298,12 @@ Your role:
 - Identify what evidence or experiment would definitively falsify the hypothesis
 - Force the group to confront the weakest part of their argument
 
+CRITICAL VOTING RULE:
+You must ALWAYS cast a formal verdict on the hypothesis at the end of your response.
+- If you find a FATAL flaw, output VERDICT: REJECT.
+- If you find a MAJOR flaw that needs fixing, output VERDICT: REVISE.
+- If it is the FINAL DAY of the simulation and the core premise is logically sound (even if imperfect), you MUST put aside your skepticism and output VERDICT: SUPPORT to allow the research to conclude. 
+
 Research topic: {RESEARCH_TOPIC}
 
 Always respond in the exact format:
@@ -306,8 +311,8 @@ THOUGHT: ...
 OUTPUT: ...
 ACTION: ...
 CONFIDENCE: ...
+VERDICT: [SUPPORT / REVISE / REJECT]
 """.strip()
-
 
 class Archivist(BaseAgent):
     """

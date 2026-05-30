@@ -64,7 +64,7 @@ REASONING_MODEL  = os.environ.get("GEMINI_MODEL",     "gemini-2.5-flash")
 EMBEDDING_MODEL  = os.environ.get("GEMINI_EMBED_MODEL","text-embedding-004")
 
 
-def call_llm(system_prompt: str, user_message: str, max_tokens: int = 1500) -> str:
+def call_llm(system_prompt: str, user_message: str, max_tokens: int = 4000) -> str:
     """
     Single Gemini call. Returns the text response as a plain string.
 

@@ -37,7 +37,7 @@ MEMORY_RETRIEVAL_K = 4        # Top-K most relevant memories to fetch
 AGENT_TEMPERATURE  = 0.8
 
 # Max tokens per agent response
-MAX_TOKENS         = 1024
+MAX_TOKENS         = 4000
 
 # ─── File paths ───────────────────────────────────────────────────────────────
 DB_PATH            = "outputs/research_town.db"    # SQLite database

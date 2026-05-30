@@ -4,33 +4,77 @@ import { useState, useEffect } from "react";
 import { Play, Trash2, Database, MessageSquare, PieChart, CheckCircle2, XCircle } from "lucide-react";
 
 export default function Dashboard() {
-  const [topic, setTopic] = useState("Investigating whether fine-tuning LLMs on logic rules causes catastrophic forgetting.");
+  const [topic, setTopic] = useState("Cross-Lingual Semantic Embeddings for Entity Resolution in Heterogeneous Corporate Datasets");
   const [days, setDays] = useState(3);
   const [isRunning, setIsRunning] = useState(false);
   
   // Data States
-  const [transcripts, setTranscripts] = useState([]);
-  const [findings, setFindings] = useState([]);
-  const [hypotheses, setHypotheses] = useState([]);
+  const [transcripts, setTranscripts] = useState<any[]>([]);
+  const [findings, setFindings] = useState<any[]>([]);
+  const [hypotheses, setHypotheses] = useState<any[]>([]);
   
   // Tab State
   const [activeTab, setActiveTab] = useState("findings"); // "findings" | "audit"
 
-  // Poll the backend every 3 seconds
-  useEffect(() => {
+useEffect(() => {
+    // 1. Keep polling for Findings and Hypotheses. 
+    // Since these only update once per "simulation day", polling every 3 seconds is harmless.
     const interval = setInterval(() => {
-      fetchTranscripts();
       fetchFindings();
       fetchHypotheses();
     }, 3000);
-    return () => clearInterval(interval);
+
+    // 2. Open the continuous SSE connection for the Live Debate chat
+    const evtSource = new EventSource("http://localhost:8000/api/stream");
+    
+    // 3. This triggers automatically whenever the backend yields new data
+    evtSource.onmessage = (event) => {
+      const newMessages = JSON.parse(event.data);
+      
+      // 4. Safely append new messages to the existing chat history
+      setTranscripts((prev) => {
+        // Prevent duplicate messages (especially helpful with React Strict Mode)
+        const existingIds = new Set(prev.map((m: any) => m.id));
+        const filteredNew = newMessages.filter((m: any) => !existingIds.has(m.id));
+        
+        return [...prev, ...filteredNew];
+      });
+    };
+
+    // 5. Cleanup function
+    return () => {
+      clearInterval(interval);
+      evtSource.close(); // Sever the connection if the user leaves the page!
+    };
   }, []);
 
-  const fetchTranscripts = async () => {
-    try {
-      const res = await fetch("http://localhost:8000/api/transcripts");
-      setTranscripts(await res.json());
-    } catch (e) {}
+  // const fetchTranscripts = async () => {
+  //   try {
+  //     const res = await fetch("http://localhost:8000/api/transcripts");
+  //     setTranscripts(await res.json());
+  //   } catch (e) {}
+  // };
+
+  // Drop this outside your main component
+  const formatMessageContent = (text: string) => {
+    // Regex to find things like "FINDING_REVIEWED:"
+    const regex = /([A-Z_]+):/g; 
+    
+    // Split the text and map over it to apply styles
+    const parts = text.split(regex);
+    
+    return parts.map((part, index) => {
+      // If this part matches our uppercase key pattern (every odd index in the split)
+      if (index % 2 !== 0) {
+        return (
+          <span key={index} className="font-bold text-blue-400 text-xs tracking-wider uppercase mt-4 block">
+            {part.replace(/_/g, ' ')} {/* Replaces underscores with spaces */}
+          </span>
+        );
+      }
+      // Otherwise, return the normal text
+      return <span key={index}>{part}</span>;
+    });
   };
 
   const fetchFindings = async () => {
@@ -132,7 +176,10 @@ export default function Dashboard() {
                       Day {msg.day} • {msg.phase.toUpperCase()}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-300 whitespace-pre-wrap">{msg.content}</p>
+                  {/* <p className="text-sm text-gray-300 whitespace-pre-wrap">{msg.content}</p> */}
+                  <div className="text-gray-200 text-sm">
+                    {formatMessageContent(msg.content)}
+                  </div>
                 </div>
               ))
             )}
@@ -152,7 +199,7 @@ export default function Dashboard() {
             </button>
             <button 
               onClick={() => setActiveTab("audit")}
-              className={`flex-1 p-4 font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === "audit" ? "border-purple-500 text-purple-400 bg-gray-800/50" : "border-transparent text-gray-400 hover:bg-gray-800/30"}`}
+              className={`flex-1 p-4 font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === "audit" ? "border-blue-500 text-blue-400 bg-gray-800/50" : "border-transparent text-gray-400 hover:bg-gray-800/30"}`}
             >
               <PieChart size={18} /> Hypothesis Audit
             </button>
