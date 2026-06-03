@@ -84,13 +84,7 @@ All agents start with the KB summary injected into their prompt. Agents remember
 
 ### Step 1 — Environment variables
 
-Create a `.env` file inside the `backend/` directory:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Open `backend/.env` and add your key exactly like this — no quotes, no `export`:
+Create a `.env` file inside the `backend/` directory and add your key exactly like this — no quotes, no `export`:
 
 ```
 GEMINI_API_KEY=AIzaSyYourActualKeyGoesHere
