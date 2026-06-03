@@ -1,0 +1,58 @@
+# docker-compose.yml
+# Place this at the ROOT of your repo (same level as backend/ and frontend/)
+#
+# Usage:
+#   docker compose up --build        ← first time or after code changes
+#   docker compose up                ← subsequent runs (uses cached images)
+#   docker compose down              ← stop everything
+
+services:
+
+  # ── Backend: FastAPI + Python agents ───────────────────────────────────────
+  backend:
+    build:
+      context: ./backend         # build from the backend/ folder
+      dockerfile: Dockerfile     # uses backend/Dockerfile
+    container_name: research_town_backend
+
+    # Environment variables — loaded from .env file in the repo root.
+    env_file:
+      - ./backend/.env
+
+    ports:
+      - "8000:8000"              # localhost:8000 → container:8000
+
+    volumes:
+      # Bind mount: Maps your Mac's backend/data folder directly into the container
+      - ./backend/data:/app/data
+
+    # Health check — Docker marks the container "healthy" once FastAPI responds.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+    restart: unless-stopped
+
+  # ── Frontend: Next.js dashboard ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    container_name: research_town_frontend
+
+    ports:
+      - "3000:3000"              # localhost:3000 → container:3000
+
+    environment:
+      # Tell Next.js where the backend API lives INSIDE the Docker network.
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+
+    depends_on:
+      backend:
+        condition: service_healthy   # wait for backend health check to pass
+
+    restart: unless-stopped

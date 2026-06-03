@@ -1,15 +1,12 @@
 # Research Town — Multi-Agent Research Simulation
 
-A from-scratch multi-agent simulation where 5 AI scientists propose hypotheses,
-debate findings, and build a canonical knowledge base powered entirely by the
-Google Gemini API. Includes a real-time Next.js dashboard and a headless CLI mode.
+A multi-agent simulation where 5 AI scientists propose hypotheses, debate findings, and build a canonical knowledge base powered entirely by the Google Gemini API. Includes a real-time Next.js dashboard and a headless CLI mode. Fully containerized with Docker for one-command deployment.
 
 ---
 
 ## What this actually does
 
-The LLM is stateless. It remembers nothing between calls.
-Code the orchestrator, the SQLite database, and the embedding vectors that creates the illusion of persistent, evolving agents.
+The LLM is stateless. It remembers nothing between calls. The orchestrator, SQLite database, and embedding vectors create the illusion of persistent, evolving agents.
 
 ```
 What it looks like:   5 scientists collaborating and learning over time
@@ -23,12 +20,16 @@ What it actually is:  A loop calling the Gemini API with carefully injected cont
 ```
 research_town/
 │
+├── docker-compose.yml              ← 1-click stack orchestration
+│
 ├── backend/                        ← Python AI logic + FastAPI server
 │   ├── api.py                      ← FastAPI: connects SQLite to the Next.js frontend
 │   ├── main.py                     ← CLI entry point (headless mode, no UI needed)
 │   ├── orchestrator.py             ← The daily loop — runs all 4 phases each day
 │   ├── agent.py                    ← Agent class: persona + memory + LLM call
+│   ├── Dockerfile                  ← Backend container config
 │   ├── .env                        ← Your API key (never committed)
+│   ├── .env.example                ← Template — copy to .env and fill in
 │   ├── requirements.txt
 │   │
 │   ├── agents/
@@ -39,11 +40,14 @@ research_town/
 │   │   ├── memory.py               ← Gemini embeddings + SQLite (agent memory + KB)
 │   │   └── evaluator.py            ← Post-simulation analysis metrics
 │   │
-│   └── data/                       ← Auto-generated SQLite database (gitignored)
-│       └── knowledge_base.db
+│   └── data/                       ← Auto-generated SQLite database (bind mounted)
+│       ├── knowledge_base.db       ← Active simulation data
+│       └── demo_seed.db            ← Fallback data for the UI when no simulation has run
 │
 └── frontend/                       ← Next.js real-time dashboard
-    ├── src/app/page.tsx             ← Main UI: live chat + knowledge base viewer
+    ├── src/app/page.tsx            ← Main UI: live debate + knowledge base viewer
+    ├── next.config.js              ← API proxy config (required for Docker networking)
+    ├── Dockerfile                  ← Frontend container config
     └── package.json
 ```
 
@@ -51,33 +55,22 @@ research_town/
 
 ## How the simulation works
 
-Each "day" runs 4 phases in sequence. Agents are stateless LLM calls — the
-orchestrator builds their context from the database before each call.
+Each "day" runs 4 phases in sequence. Agents are stateless LLM calls — the orchestrator builds their context from the database before each call.
 
-```
-Phase 1 — Hypothesis
-  Lead Scientist reads the Knowledge Base → proposes today's hypothesis
-  → assigns specific tasks to each team member
+**Phase 1 — Hypothesis**
+The Lead Scientist reads the Knowledge Base and proposes today's hypothesis, then assigns specific tasks to each team member.
 
-Phase 2 — Research
-  Researcher receives their assigned task → investigates → writes findings report
-  Findings are injected into Phase 3
+**Phase 2 — Research**
+The Researcher receives their assigned task, investigates, and writes a structured findings report. Findings are injected into Phase 3.
 
-Phase 3 — Debate  (information asymmetry is intentional)
-  Critic          reads the researcher's FINDINGS  → attacks the METHOD
-  Devil's Advocate reads the HYPOTHESIS only       → attacks the PREMISE
-  ↑ Neither sees the other's challenge — keeps critiques structurally independent
+**Phase 3 — Debate** *(information asymmetry is intentional)*
+The Critic reads the researcher's findings and attacks the **method**. The Devil's Advocate reads only the hypothesis and attacks the **premise**. Neither sees the other's challenge — this keeps critiques structurally independent.
 
-Phase 4 — Synthesis
-  Archivist reads everything from today → writes objective summary
-  Orchestrator parses archivist output → commits approved findings to SQLite KB
+**Phase 4 — Synthesis**
+The Archivist reads everything from today and writes an objective summary. The orchestrator parses the archivist's output and commits approved findings to the SQLite knowledge base.
 
-Day N+1
-  All agents start with the KB summary injected into their prompt.
-  Agents "remember" via:
-    • Gemini embedding retrieval (personal episodic memory — semantic search)
-    • SQLite KB summary (shared validated findings — everyone reads this)
-```
+**Day N+1**
+All agents start with the KB summary injected into their prompt. Agents remember via Gemini embedding retrieval (personal episodic memory — semantic search) and the SQLite KB summary (shared validated findings that everyone reads).
 
 ---
 
@@ -85,92 +78,105 @@ Day N+1
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
-- A Gemini API key — get one free at https://aistudio.google.com/app/apikey
+- **Docker Desktop** — recommended, handles everything
+- **Python 3.10+ and Node.js 18+** — only needed if running natively without Docker
+- **Gemini API key** — get one free at https://aistudio.google.com/app/apikey
 
----
+### Step 1 — Environment variables
 
-### Backend setup
-
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-Create your `.env` file:
+Create a `.env` file inside the `backend/` directory:
 
 ```bash
-cp .env
+cp backend/.env.example backend/.env
 ```
 
-Open `.env` and set your key:
+Open `backend/.env` and add your key exactly like this — no quotes, no `export`:
 
 ```
-GEMINI_API_KEY=your_key_here
-```
-
----
-
-### Frontend setup
-
-```bash
-cd frontend
-npm install
+GEMINI_API_KEY=AIzaSyYourActualKeyGoesHere
 ```
 
 ---
 
 ## Running the simulation
 
-### Option A — Web dashboard (recommended)
+### Option A — Docker Compose (recommended)
 
-Gives you a real-time UI to enter topics, watch debates live, and browse the KB.
+Runs the entire stack (frontend + backend + database) with one command. No Python or Node installation required.
 
-**Terminal 1 — start the backend API:**
+```bash
+docker compose up --build
+```
+
+Open http://localhost:3000 — enter a research topic, set the number of days, click **Run**.
+
+To stop:
+
+```bash
+docker compose down
+```
+
+---
+
+### Option B — Native web dashboard
+
+Run the servers directly on your machine without Docker.
+
+**Terminal 1 — backend:**
 
 ```bash
 cd backend
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 uvicorn api:app --reload --port 8000
 ```
 
-**Terminal 2 — start the frontend:**
+**Terminal 2 — frontend:**
+
+Create `frontend/.env.local` containing:
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+Then:
 
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-Open http://localhost:3000 — enter a research topic, set the number of days, click Run.
+Open http://localhost:3000.
 
 ---
 
-### Option B — Headless CLI
+### Option C — Headless CLI
 
-Run a full simulation in the terminal with no UI. Useful for bulk testing or
-running overnight experiments.
+Run a full simulation in the terminal with no UI. Useful for bulk testing or overnight experiments.
 
 ```bash
 cd backend
+source venv/bin/activate
 python main.py
 ```
 
-Change `RESEARCH_TOPIC` and `DAYS` at the top of `main.py` before running.
-The full debate prints to the terminal. `evaluator.py` runs automatically when done.
+Change `RESEARCH_TOPIC` and `DAYS` at the top of `main.py` before running. The full debate prints to the terminal. `evaluator.py` runs automatically when done.
 
 ---
 
-## Inspecting the data
+## The database and seed fallback
 
-Everything is stored in a single SQLite file at `backend/data/knowledge_base.db`.
-To test use `backend/data/demo_seed.db`
+Everything is stored in a single SQLite file at `backend/data/knowledge_base.db`. In Docker, this is bind-mounted to your host machine so you can inspect it at any time.
+
+**Fallback logic:** if `knowledge_base.db` does not exist, the API automatically serves data from `demo_seed.db` so the dashboard is never empty. Once you click Run, a fresh `knowledge_base.db` is created and the API seamlessly switches to your live simulation data.
+
+### Inspecting the database
 
 ```bash
 cd backend
 sqlite3 data/knowledge_base.db
 ```
-
-Useful queries:
 
 ```sql
 -- All validated findings
@@ -181,17 +187,7 @@ SELECT day, phase, agent, substr(content, 1, 100) FROM transcript;
 
 -- All hypotheses and their outcomes
 SELECT day, status, substr(content, 1, 120) FROM hypotheses;
-
--- Every contradiction raised (including unresolved ones)
-SELECT day, raised_by, substr(content, 1, 100) FROM contradictions;
-
--- Agent episodic memories
-SELECT agent_name, day, phase, substr(content, 1, 80) FROM episodic_memories;
 ```
-
-Episodic memories are stored as Gemini embedding vectors (768-dim JSON arrays)
-inside the same database. Memory retrieval uses numpy cosine similarity —
-no external vector database required.
 
 ---
 
@@ -199,37 +195,57 @@ no external vector database required.
 
 ### Change the research topic
 
-**Web dashboard:** type it into the UI before clicking Run.
+**Web dashboard:** type it into the input field before clicking Run.
 
-**CLI mode:** edit `RESEARCH_TOPIC` in `backend/main.py`. Works with any domain:
-
-```python
-RESEARCH_TOPIC = "The economic causes of medieval famines"
-RESEARCH_TOPIC = "Whether transformer attention is biologically plausible"
-RESEARCH_TOPIC = "Antibiotic resistance mechanisms in hospital-acquired infections"
-```
+**CLI mode:** edit `RESEARCH_TOPIC` in `backend/main.py`.
 
 ### Change agent personalities
 
-Edit system prompts in `backend/agents/personas.py`.
-The personality paragraph is the main lever — it controls tone, confidence,
-aggressiveness, and epistemic style. Try making the Devil's Advocate more
-confrontational and observe the downstream impact on KB quality.
-
-### Change information asymmetry
-
-In `backend/orchestrator.py`, `_phase_debate()` controls what each agent sees.
-Currently the Devil's Advocate does NOT see the researcher's findings.
-Give them the findings and watch the debate become less structurally independent.
+Edit system prompts in `backend/agents/personas.py`. The personality paragraph is the main lever — it controls tone, confidence, aggressiveness, and epistemic style. Try making the Devil's Advocate more aggressive and observe the impact on Knowledge Base quality.
 
 ### Switch models
 
 In `backend/.env`:
 
 ```
-GEMINI_MODEL=gemini-1.5-pro         # smarter, slower, higher cost
+GEMINI_MODEL=gemini-2.5-flash        # default — fast and cheap
 GEMINI_EMBED_MODEL=text-embedding-004
 ```
+
+---
+
+## Common issues
+
+**`Error: ports are not available: listen tcp 0.0.0.0:3000`**
+
+Another process is using port 3000. Kill it:
+
+```bash
+npx kill-port 3000
+# or find and kill manually
+lsof -i :3000
+kill -9 <PID>
+```
+
+**`ERROR: Your default credentials were not found` (inside Docker)**
+
+Docker failed to read your `.env` file, so the Gemini SDK fell back to looking for Google Cloud credentials. Fix:
+
+1. Ensure the file is named exactly `.env` inside the `backend/` folder.
+2. Ensure there are no quotes around the API key value.
+3. Force Docker to recreate the container:
+
+```bash
+docker compose up -d --force-recreate backend
+```
+
+**`JSON parse failed`**
+
+Gemini occasionally returns non-JSON for a structured call. The code handles this gracefully, logs a warning, and continues. Not a crash — safe to ignore.
+
+**`ResourceExhausted` / rate limit**
+
+The LLM wrapper retries automatically after 30 seconds. If it happens often, switch to `gemini-2.0-flash` in your `.env`.
 
 ---
 
@@ -239,59 +255,7 @@ After the simulation ends, `evaluator.py` runs automatically and reports:
 
 | Metric | What it shows |
 |--------|---------------|
-| Hypothesis survival rate | % of proposals that survive peer review |
-| Belief drift | How much agent confidence changes across days |
+| Hypothesis survival rate | Percentage of proposals that survived peer review |
+| Belief drift | How agent confidence scores changed across days |
 | Citation graph | Which agents cited whose work (epistemic authority) |
-| Debate intensity | Challenge signal frequency per day (flaw, disagree, contradicts) |
-
----
-
-## Using Vertex AI instead of the direct Gemini API
-
-Add to `backend/.env`:
-
-```
-USE_VERTEX=true
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_CLOUD_LOCATION=us-central1
-```
-
-Then authenticate:
-
-```bash
-gcloud auth application-default login
-```
-
-Uncomment the Vertex AI block in `backend/utils/llm.py`. No other files change.
-
----
-
-## Common issues
-
-**`ModuleNotFoundError`**
-Make sure you are running commands from the correct directory.
-Python commands from inside `backend/`. npm commands from inside `frontend/`.
-
-**`[Embedding error: 404 ... not found for API version v1beta]`**
-The old `google-generativeai` package is still installed alongside the new one.
-Fix:
-```bash
-pip uninstall google-generativeai -y
-pip install google-genai --upgrade
-```
-
-**`JSON parse failed`**
-Gemini occasionally returns non-JSON for a structured call. The code handles this
-gracefully, logs a warning, and continues. Not a crash — safe to ignore.
-
-**`ResourceExhausted` / rate limit**
-The LLM wrapper retries automatically after 30 seconds. If it happens often,
-switch to `gemini-2.0-flash` (faster quota recovery than pro models).
-
-**Nothing committed to KB on Day 1**
-Normal. The archivist is conservative on Day 1 — findings lack supporting evidence.
-Entries accumulate from Day 2 onwards as claims get corroborated.
-
-**Frontend shows stale data**
-The Next.js page polls the FastAPI backend. Make sure `uvicorn` is still running
-in the backend terminal (`uvicorn api:app --reload --port 8000`).
+| Debate intensity | Challenge signal frequency per day |

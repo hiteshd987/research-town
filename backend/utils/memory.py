@@ -211,8 +211,10 @@ class KnowledgeBase:
     def __init__(self, data_dir: str = "data"):
         os.makedirs(data_dir, exist_ok=True)
         db_path = os.path.join(data_dir, "knowledge_base.db")
+
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self._init_tables()
+
 
     def _init_tables(self):
         self.conn.executescript("""

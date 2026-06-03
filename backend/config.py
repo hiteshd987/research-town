@@ -20,7 +20,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # Options: "gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"
 # REASONING_MODEL = "gemini-1.5-flash"   # flash = faster + cheaper for dev
 # REASONING_MODEL = "gemini-1.5-pro"   # pro = smarter, use for final runs
-raw_reason_model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+raw_reason_model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 REASONING_MODEL = raw_reason_model.replace("models/", "")
 
 # Model to use for creating embeddings (memory retrieval)

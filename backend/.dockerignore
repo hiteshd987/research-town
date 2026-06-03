@@ -1,0 +1,26 @@
+# backend/.dockerignore
+
+# Never bake secrets into the image
+.env
+
+# Simulation data — lives in a Docker volume, not the image
+data/
+outputs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE & Git
+.vscode/
+.idea/
+.git/
+.gitignore

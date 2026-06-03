@@ -1,0 +1,16 @@
+# frontend/.dockerignore
+
+# Dependencies — reinstalled during build
+node_modules/
+
+# Next.js build output — rebuilt during docker build
+.next/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+
+# Git
+.git/
+.gitignore

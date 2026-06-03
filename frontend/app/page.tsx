@@ -15,36 +15,37 @@ export default function Dashboard() {
   
   // Tab State
   const [activeTab, setActiveTab] = useState("findings"); // "findings" | "audit"
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 useEffect(() => {
-    // 1. Keep polling for Findings and Hypotheses. 
-    // Since these only update once per "simulation day", polling every 3 seconds is harmless.
+    // Force direct connection to backend, completely bypassing Next.js buffering
+    const backendUrl = "http://localhost:8000";
+
+    // 1. Polling for Findings/Hypotheses
     const interval = setInterval(() => {
       fetchFindings();
       fetchHypotheses();
     }, 3000);
 
-    // 2. Open the continuous SSE connection for the Live Debate chat
-    const evtSource = new EventSource("http://localhost:8000/api/stream");
+    // 2. Direct connection to the FastAPI SSE endpoint
+    const evtSource = new EventSource(`${backendUrl}/api/stream`);
     
-    // 3. This triggers automatically whenever the backend yields new data
+    // 3. Handle incoming stream messages
     evtSource.onmessage = (event) => {
       const newMessages = JSON.parse(event.data);
       
-      // 4. Safely append new messages to the existing chat history
       setTranscripts((prev) => {
-        // Prevent duplicate messages (especially helpful with React Strict Mode)
+        // Prevent duplicate messages
         const existingIds = new Set(prev.map((m: any) => m.id));
         const filteredNew = newMessages.filter((m: any) => !existingIds.has(m.id));
-        
         return [...prev, ...filteredNew];
       });
     };
 
-    // 5. Cleanup function
+    // 4. Cleanup
     return () => {
       clearInterval(interval);
-      evtSource.close(); // Sever the connection if the user leaves the page!
+      evtSource.close(); 
     };
   }, []);
 
@@ -79,21 +80,23 @@ useEffect(() => {
 
   const fetchFindings = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/findings");
+      // const res = await fetch("http://localhost:8000/api/findings");
+      const res = await fetch(`/api/findings`);
       setFindings(await res.json());
     } catch (e) {}
   };
 
   const fetchHypotheses = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/hypotheses");
+      // const res = await fetch("http://localhost:8000/api/hypotheses");
+      const res = await fetch(`/api/hypotheses`);
       setHypotheses(await res.json());
     } catch (e) {}
   };
 
   const startSimulation = async () => {
     setIsRunning(true);
-    await fetch("http://localhost:8000/api/simulate", {
+    await fetch(`/api/simulate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ topic, days }),
@@ -102,7 +105,7 @@ useEffect(() => {
   };
 
   const clearDatabase = async () => {
-    await fetch("http://localhost:8000/api/clear", { method: "DELETE" });
+    await fetch(`/api/clear`, { method: "DELETE" });
     setTranscripts([]);
     setFindings([]);
     setHypotheses([]);

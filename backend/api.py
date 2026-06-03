@@ -21,12 +21,21 @@ app.add_middleware(
 )
 
 DB_PATH = "data/knowledge_base.db"
+SEED_PATH = "data/demo_seed.db"
 
 def dict_factory(cursor, row):
     d = {}
     for idx, col in enumerate(cursor.description):
         d[col[0]] = row[idx]
     return d
+
+def get_active_db_path():
+    """Return the active DB path, falling back to seed if main is missing."""
+    if os.path.exists(DB_PATH):
+        return DB_PATH
+    if os.path.exists(SEED_PATH):
+        return SEED_PATH
+    return None
 
 # @app.get("/api/transcripts")
 # def get_transcripts():
@@ -42,6 +51,7 @@ def dict_factory(cursor, row):
 @app.get("/api/findings")
 def get_findings():
     """Fetch validated findings for the dashboard."""
+    db_to_use = get_active_db_path()
     if not os.path.exists(DB_PATH):
         return []
     conn = sqlite3.connect(DB_PATH)
@@ -53,6 +63,7 @@ def get_findings():
 @app.get("/api/hypotheses")
 def get_hypotheses():
     """Fetch hypotheses for the Graveyard/Audit dashboard."""
+    db_to_use = get_active_db_path()
     if not os.path.exists(DB_PATH):
         return []
     conn = sqlite3.connect(DB_PATH)
@@ -95,6 +106,8 @@ async def stream_transcripts():
         last_id = 0 
         
         while True:
+            db_to_use = get_active_db_path()
+
             # FIX 1: If the DB file is missing, reset the ID counter to 0
             if not os.path.exists(DB_PATH):
                 last_id = 0 
